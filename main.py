@@ -10,24 +10,25 @@ Original file is located at
 # Data Analysis of Tasks Completed
 # Task Manager that collects data is Gqueues https://gqueues.com
 # Export of tasks from Gqueues is in csv format and imported into google drive
-# Script reads the csv from Google Drive, searches for the portion of the csv
-# containing the task data, then loads that data to be analyzed and charted
+# Script reads the csv from Google Drive, searches for the portion of the csv containing the task data, then loads that data to be analyzed and charted
 
 # Import Libraries
-import matplotlib.pyplot as plt
 import pandas
 import csv
+import numpy
+import matplotlib.pyplot as plt
+from datetime import timedelta
+
 
 # Set path to latest gqueues export csv
-path = "C:\\Users\\isaac\\Downloads\\gqueues_backup_2023_10_24.csv"
+path = "gqueues_backup_2023_10_24.csv"
 
 # open csv and read
 file = open(path, "r", encoding="utf-8")
 reader = csv.reader(file)
 lines = list(reader)
 
-# look for task data in section of the export that contains the task items
-# start and end rows
+# look for task data in section of the export that contains the task items start and end rows
 for line in lines:
     if "*GQ* Items" in line:
         lineNumStart = lines.index(line) + 1
@@ -39,42 +40,48 @@ for line in lines:
         break
 
 # subset the file for the data we need
-data = pandas.read_csv(path, skiprows=lineNumStart, skipfooter=len(lines) - lineNumEnd)
-
-# Describe Data Frame to confirm we have proper parsing
-data.info()
+data = pandas.read_csv(path, skiprows=lineNumStart,
+                       skipfooter=len(lines) - lineNumEnd)
 
 # Convert the data type of column 'Date' from string (YYYY/MM/DD) to datetime64
-data["dateCompleted"] = pandas.to_datetime(data["dateCompleted"], format="%Y-%m-%d")
-testData = data[data["dateCompleted"] >= pandas.to_datetime("2023-01-01")][
-    "dateCompleted"
-]
+data["dateCompleted"] = pandas.to_datetime(
+    data["dateCompleted"], format="%Y-%m-%d")
 
-# Chart output
-testData.groupby(data["dateCompleted"].dt.date).size().plot()
-testData = data[data["dateCompleted"] >= pandas.to_datetime("2023-01-01")][
-    "dateCompleted"
-]
-testData.groupby(data["dateCompleted"].dt.strftime("%W")).size().plot()
-
+# create list of tags
 df = data.copy()
 unique_tags = df["tags"].unique()
+
+# if there is more than one tag on a completed task, just use the first one (BAD ASSUMPTION)
+for tag in unique_tags:
+    if ',' in str(tag):
+        unique_tags[numpy.where(unique_tags == tag)[0][0]] = tag.split(',')[0]
+
+unique_tags = numpy.unique(unique_tags.astype(str))
+
+# create a column for each tag in the list of unique tags
 for value in unique_tags:
     df[value] = df["tags"].eq(value).astype(int)
 
-# MAKE A BAR CHART of TAGS
-# https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.plot.bar.html
+# MAKE A BAR CHART of TAGS - https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.plot.bar.html
 df2 = df.copy()
+
+# convert dateCompleted to date format
 df2["dateCompleted"] = df2["dateCompleted"].dt.date
 
-df2 = df2[df2["dateCompleted"] >= pandas.to_datetime("2023-01-01")]
+# filter dataframe to relevant time period
+df2 = df2[df2['dateCompleted'] >= pandas.to_datetime('2023-01-01')]
 
 # optional date to week
 # Convert the date string to a datetime object
 df2["dateCompleted"] = pandas.to_datetime(df2["dateCompleted"])
 
-# Get the week of year from the datetime object
-df2["dateCompleted"] = df2["dateCompleted"].dt.isocalendar().week
+# get start date of week
+for completionDate in df2["dateCompleted"]:
+    df2["dateCompleted"][df2["dateCompleted"] ==
+                         completionDate] = completionDate - timedelta(days=completionDate.weekday())
+
+# format date to strip timestamp
+df2["dateCompleted"] = pandas.to_datetime(df2["dateCompleted"]).dt.date
 
 # build aggregated data frame by date
 df3 = df2.groupby(pandas.Grouper(key="dateCompleted")).sum()
@@ -86,17 +93,7 @@ graph = df3[unique_tags]
 graph["dateCompleted"] = df3["dateCompleted"]
 graph = graph.sort_index(axis=1)
 
-# plt bar graph with color map
-plt = graph.plot.bar(
-    x="dateCompleted",
-    rot=45,
-    stacked=True,
-    figsize=(15, 10),
-    fontsize=6,
-    cmap=plt.cm.tab20,
-    legend=True,
-    xlabel="Week Number of Year",
-    ylabel="Num Tasks Completed",
-)
-
+# set a color map for the bar graph
+plt = graph.plot.bar(x="dateCompleted", rot=45, stacked=True, figsize=(15, 10), fontsize=6, cmap=plt.cm.tab20,
+                     legend=True, xlabel="Week of Year", ylabel="Num Tasks Completed").legend(loc="upper left")
 plt.figure.savefig("bar_graph.png", format="png")
