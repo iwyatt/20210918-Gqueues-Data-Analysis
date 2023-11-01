@@ -13,4 +13,4 @@ Don't use it. Its inefficient, throws lots of warnings, and the code is embarass
 - [x] Add gitignore
 - [ ] lots of charts
 - [ ] table of computed metrics
-- [ ] save output
+- [x] save output
