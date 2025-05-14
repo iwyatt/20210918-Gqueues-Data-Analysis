@@ -14,12 +14,9 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
-# numpy is implicitly used by pandas, explicit import not strictly needed for this refactor
-# import numpy
 
 # --- Configuration Constants ---
 DEFAULT_CSV_PATH = Path("gqueues_backup_2025_05_01.csv")
-# Update this path if your file is named differently or located elsewhere.
 
 RELEVANT_DATE_START = pd.Timestamp('2025-01-01')
 
@@ -52,7 +49,7 @@ def find_data_section_indices(csv_filepath: Path) -> Tuple[int, int]:
 
     with csv_filepath.open("r", encoding=CSV_ENCODING, newline='') as f:
         reader = csv.reader(f)
-        lines = list(reader)  # Read all lines to easily find markers by index
+        lines = list(reader) 
 
     header_row_idx = -1
     assignments_marker_idx = -1
@@ -65,7 +62,6 @@ def find_data_section_indices(csv_filepath: Path) -> Tuple[int, int]:
                 header_row_idx = i + 1  # Header is the line *after* the marker line
             if ASSIGNMENTS_MARKER in line_content:
                 assignments_marker_idx = i
-                # Optimization: if header found, and assignments marker found, break
                 if header_row_idx != -1:
                     break
     
@@ -74,8 +70,6 @@ def find_data_section_indices(csv_filepath: Path) -> Tuple[int, int]:
     if assignments_marker_idx == -1:
         raise ValueError(f"'{ASSIGNMENTS_MARKER}' marker not found in CSV: {csv_filepath}")
 
-    # Original logic: lineNumEnd = lines.index(line_with_ASSIGNMENTS) - 2
-    # This lineNumEnd was the index of the last data row.
     last_data_row_idx = assignments_marker_idx - 2
 
     if last_data_row_idx < header_row_idx:
@@ -86,7 +80,6 @@ def find_data_section_indices(csv_filepath: Path) -> Tuple[int, int]:
         )
 
     # Number of rows in the data block, including its header.
-    # e.g., header at index 10, last data row at index 20.
     # Block rows = 20 - 10 + 1 = 11 rows.
     num_total_data_block_rows = (last_data_row_idx - header_row_idx) + 1
     
@@ -125,12 +118,11 @@ def load_and_preprocess_tasks(
         skiprows=header_row_index,
         nrows=num_data_lines_after_header if num_data_lines_after_header >= 0 else 0,
         encoding=CSV_ENCODING,
-        engine='python' # Using 'python' engine for consistency, though not strictly needed for nrows.
+        engine='python'
     )
 
     # Convert 'dateCompleted' from string to datetime objects.
     # Removed explicit format to allow pandas to infer, as input might contain time.
-    # If unparseable dates exist and should be ignored, add errors='coerce'.
     df["dateCompleted"] = pd.to_datetime(df["dateCompleted"])
 
     # Process tags:
@@ -141,19 +133,13 @@ def load_and_preprocess_tasks(
     )
     
     # 2. Get unique primary tags. These will be used as column names.
-    #    The .unique() method on a Series of strings (like 'primary_tag') will return an ndarray of strings.
-    #    Sorting them ensures consistent column order later if needed.
-    #    This includes 'nan' as a string if it was a primary tag.
     unique_primary_tags = sorted(df['primary_tag'].unique().tolist())
 
-    # 3. Create one-hot encoded columns for each unique primary tag.
+    # 3. Create one-shot encoded columns for each unique primary tag.
     for tag_name in unique_primary_tags:
         # Ensure tag_name is a string, as it becomes a column name.
         # unique_primary_tags should already contain strings.
         df[str(tag_name)] = (df['primary_tag'] == tag_name).astype(int)
-    
-    # Optional: Drop the temporary 'primary_tag' column if not needed further.
-    # df.drop(columns=['primary_tag'], inplace=True)
 
     return df, unique_primary_tags
 
@@ -305,9 +291,6 @@ def main():
         print(f"ERROR: Invalid data or configuration. {e}")
     except Exception as e:
         print(f"ERROR: An unexpected error occurred: {e}")
-        # For debugging, you might want to re-raise or log traceback:
-        # import traceback
-        # print(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
